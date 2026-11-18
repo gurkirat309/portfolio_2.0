@@ -8,7 +8,7 @@
 
 const FETCH_CONCURRENCY = 6;
 const DECODE_CONCURRENCY = 3;
-const MIN_SWAP_MS = 30;
+const MIN_SWAP_MS = 40; // the footage is 24 fps: ~25 picture changes a second is all it has
 
 // Coarse-to-fine load order: a sparse pass first so the whole timeline is scrubbable early.
 function loadOrder(count) {
@@ -46,9 +46,12 @@ export class FramePlayer {
     this.onScrubbable = onScrubbable || (() => {});
     this.onDraw = onDraw || (() => {});
     this.scrubbableAt = Math.ceil(this.count / 8) + 2; // after the stride-8 pass
+    // Frames are full 1080p now (8 MB each once decoded on desktop, 5 MB on phones), so the
+    // decoded window is a little narrower than before to keep memory about where it was.
+    // The swap limit in draw() means a fast scrub never needs more than this ahead.
     const small = Math.min(screen.width, screen.height) < 900;
-    this.keepBack = small ? 8 : 10;
-    this.keepAhead = small ? 14 : 22;
+    this.keepBack = small ? 6 : 8;
+    this.keepAhead = small ? 12 : 16;
     this.last = { f: -1, key: '' };
     this.lastA = -1;
     this.lastSwap = 0;
@@ -163,7 +166,7 @@ export class FramePlayer {
     if (a < 0) return;
     // Each new frame is a full-size texture upload, which is what costs time on the GPU.
     // The footage is 24 fps, so during a fast scrub, swapping the picture more than
-    // ~30 times a second only burns frame budget. Hold the current frame for a moment instead.
+    // ~25 times a second only burns frame budget. Hold the current frame for a moment instead.
     const now = performance.now();
     const speed = Math.abs(fi - this.last.f); // video frames per display frame
     if (a !== this.lastA && this.lastA >= 0 && now - this.lastSwap < MIN_SWAP_MS && key === this.last.key) {
@@ -180,6 +183,10 @@ export class FramePlayer {
     const dw = (x1 - x0) * view.w;
     const dh = (y1 - y0) * view.h;
     const ctx = this.ctx;
+    // While the picture is moving, scale with plain bilinear filtering (cheapest for a fresh
+    // 1080p frame); once it comes to rest, draw it again with high-quality filtering.
+    const moving = speed > 0.001;
+    ctx.imageSmoothingQuality = moving ? 'low' : 'high';
     ctx.globalAlpha = 1;
     ctx.drawImage(this.bitmaps.get(a), dx, dy, dw, dh);
     // Cross-fade into the next frame for positions between two frames. Only when moving
@@ -190,7 +197,8 @@ export class FramePlayer {
       ctx.drawImage(this.bitmaps.get(i + 1), dx, dy, dw, dh);
       ctx.globalAlpha = 1;
     }
-    this.dirty = a !== i; // keep trying until the exact frame is decoded
+    // Keep redrawing until the exact frame is decoded, and once more at rest in high quality.
+    this.dirty = a !== i || moving;
     this.last = { f: fi, key };
     this.onDraw(a);
   }
