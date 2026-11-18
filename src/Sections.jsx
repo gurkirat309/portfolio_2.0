@@ -4,6 +4,7 @@ import ProjectsTrack from './ProjectsTrack.jsx';
 import StackTools from './StackTools.jsx';
 import ExperienceTimeline from './ExperienceTimeline.jsx';
 import ProjectShot from './ProjectShot.jsx';
+import ShutterGlyphFooter from '@/components/ui/shutter-glyph-footer';
 import AchievementsBook from './AchievementsBook.jsx';
 import FoldMarquee from './FoldMarquee.jsx';
 
@@ -195,15 +196,46 @@ export function Contact({ reducedMotion }) {
   );
 }
 
+// The closing footer: "GURKIRAT" set across the full width in a geometric display alphabet,
+// with the R swapped for a three-blade shutter that turns toward the pointer.
+// The component's newsletter form is replaced with a plain way to get in touch (there is no
+// newsletter), and every link points somewhere real.
+const FOOTER_SOCIALS = [
+  { label: 'LinkedIn', href: person.linkedin },
+  { label: 'GitHub', href: person.github },
+  { label: 'Email', href: `mailto:${person.email}` },
+];
+const FOOTER_MORE = [
+  { label: 'Résumé', href: `${person.site}${person.resume}` },
+  { label: 'Certificates', href: person.certificates },
+  { label: 'Back to top', href: '#top' },
+];
+
 export function Footer() {
   return (
-    <footer className="footer">
-      <div className="wrap footer__row">
-        <p>© 2026 Gurkirat Singh · {person.city}</p>
-        <a className="link" href="#top">
-          Back to top
-        </a>
-      </div>
-    </footer>
+    <ShutterGlyphFooter
+      brand="Gurkirat"
+      wordmark="Gurkirat"
+      shutterAt={2}
+      company={`${person.name} · ${person.city}`}
+      since={0}
+      background="#39e6a0"
+      ink="#080d0b"
+      fontMono="var(--f-mono)"
+      className="site-footer"
+      socials={FOOTER_SOCIALS}
+      legal={FOOTER_MORE}
+      lead={
+        <>
+          <p className="sgf-lede">Get in touch</p>
+          <a className="sgf-link footer-mail" href={`mailto:${person.email}`}>
+            <span>{person.email}</span>
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M1 6h9.2M6.4 2.2 10.2 6l-3.8 3.8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="square" />
+            </svg>
+          </a>
+        </>
+      }
+    />
   );
 }
