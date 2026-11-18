@@ -9,6 +9,9 @@
 const FETCH_CONCURRENCY = 6;
 const DECODE_CONCURRENCY = 3;
 const MIN_SWAP_MS = 30;
+// When the exact frame isn't decoded yet, show a neighbour at most this many frames away
+// (a third of a second of footage); otherwise keep the picture already on the canvas.
+const MAX_GAP = 8;
 
 // Coarse-to-fine load order: a sparse pass first so the whole timeline is scrubbable early.
 function loadOrder(count) {
@@ -28,7 +31,9 @@ function loadOrder(count) {
 export class FramePlayer {
   constructor(canvas, manifest, setName, { onProgress, onScrubbable, onDraw } = {}) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    // A normal, compositor-synced canvas: 'desynchronized' (low-latency) mode can tear and
+    // flicker on phone GPUs.
+    this.ctx = canvas.getContext('2d', { alpha: false });
     this.count = manifest.count;
     this.fps = manifest.fps;
     this.set = manifest.sets[setName];
@@ -120,7 +125,7 @@ export class FramePlayer {
     const lo = this.center - this.keepAhead - 4;
     const hi = this.center + this.keepAhead + 4;
     for (const [i, bm] of this.bitmaps) {
-      if ((i < lo || i > hi) && i !== 0 && i !== this.count - 1) {
+      if ((i < lo || i > hi) && i !== 0 && i !== this.count - 1 && i !== this.lastA) {
         bm.close();
         this.bitmaps.delete(i);
       }
@@ -129,7 +134,9 @@ export class FramePlayer {
 
   nearest(i) {
     if (this.bitmaps.has(i)) return i;
-    for (let d = 1; d < this.count; d += 1) {
+    // Bounded search: on a fast swipe that outruns decoding, jumping to a far decoded frame
+    // (like the poster at frame 0 or the smoke at the end) flashes the wrong picture.
+    for (let d = 1; d <= MAX_GAP; d += 1) {
       const a = i - d * this.dir;
       const b = i + d * this.dir;
       if (a >= 0 && a < this.count && this.bitmaps.has(a)) return a;
@@ -140,11 +147,23 @@ export class FramePlayer {
 
   resize(vw, vh) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.canvas.width = Math.round(vw * dpr);
-    this.canvas.height = Math.round(vh * dpr);
+    const w = Math.round(vw * dpr);
+    const h = Math.round(vh * dpr);
+    // Setting a canvas's size wipes it. Phones fire resize events all the time while scrolling
+    // (the address bar sliding in and out), so only resize on a real change...
+    if (w === this.canvas.width && h === this.canvas.height) return;
+    this.canvas.width = w;
+    this.canvas.height = h;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.imageSmoothingQuality = 'high';
     this.dirty = true;
+    // ...and repaint the current frame straight away, so no blank frame is ever shown.
+    if (this.lastView && this.last.f >= 0) {
+      const f = this.last.f;
+      this.last = { f: -1, key: '' };
+      this.lastSwap = 0;
+      this.draw(f, this.lastView);
+    }
   }
 
   // f: fractional frame index. view: where the full 16:9 frame sits on screen, in CSS px.
@@ -192,6 +211,7 @@ export class FramePlayer {
     }
     this.dirty = a !== i; // keep trying until the exact frame is decoded
     this.last = { f: fi, key };
+    this.lastView = view;
     this.onDraw(a);
   }
 
