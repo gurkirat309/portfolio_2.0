@@ -1,18 +1,21 @@
 # Exports the logo-free intro video as WebP frame sets for the scroll-scrubbed canvas.
-#   d  desktop: the whole frame at the source's full 1920x1080
-#   m  mobile:  a crop of the horizontal band a portrait screen ever shows (x 12%-76%), 1080 tall
-# Frames go in a versioned folder (frames/v2/...): change VERSION whenever the frames change,
-# so browsers and CDN caches can never keep showing an older, softer set.
+#   d  desktop: the whole frame, 1600x900
+#   m  mobile:  a crop of the horizontal band a portrait screen ever shows (x 12%-76%), 900 tall
+# 900p keeps every frame cheap enough to decode and draw that scrubbing stays smooth (full 1080p
+# was 44% more work per frame and made the intro lag); gentle compression (q78-80) keeps the
+# dark smoke free of blocking and banding.
+# Frames go in a versioned folder (frames/v3/...): change VERSION whenever the frames change,
+# so browsers and CDN caches can never keep showing an older set.
 # Also writes the poster (first frame) and the background still (last frame).
 # Usage: python scripts/build-frames.py video-src/intro-clean.mp4 public
 import json, os, sys
 import cv2
 
 src, out = sys.argv[1], sys.argv[2]
-VERSION = 'v2'
+VERSION = 'v3'
 SETS = {
-    'd': {'crop': [0.0, 0.0, 1.0, 1.0], 'height': 1080, 'quality': 80},
-    'm': {'crop': [0.12, 0.0, 0.76, 1.0], 'height': 1080, 'quality': 78},
+    'd': {'crop': [0.0, 0.0, 1.0, 1.0], 'height': 900, 'quality': 80},
+    'm': {'crop': [0.12, 0.0, 0.76, 1.0], 'height': 900, 'quality': 78},
 }
 
 cap = cv2.VideoCapture(src)
