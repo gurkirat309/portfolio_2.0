@@ -1,0 +1,14 @@
+node_modules
+dist
+.taste-skill
+*.zip
+taste-skill-main/
+video-src/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# raw source footage (the site uses public/frames, built from it)
+*.mp4

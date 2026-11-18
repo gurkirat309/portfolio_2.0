@@ -1,0 +1,14 @@
+/* Tailwind v4, utilities only.
+   No preflight (Tailwind's global reset): the rest of the site is plain CSS and stays as it is.
+   The theme supplies the colour and spacing variables the utilities read.
+   Utilities are imported unlayered so they win over the site's element rules (h4, p, a). */
+@import 'tailwindcss/theme.css';
+@import 'tailwindcss/utilities.css';
+
+/* The site is always dark, so "dark:" styles follow the .dark class set on <html>,
+   not the visitor's system setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Only scan the site's own source for class names. */
+@source not '../taste-skill-main';
+@source not '../video-src';
