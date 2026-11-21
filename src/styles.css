@@ -2772,3 +2772,55 @@ h3 {
 .friday.is-on.is-tucked .friday__launch:focus-visible {
   opacity: 1;
 }
+
+/* Tools cards: larger titles, and each tool as an icon chip (asked for: the text read too small) */
+.tools-hover h4 {
+  font-family: var(--f-display);
+  font-size: clamp(19px, 1.6vw, 23px);
+  letter-spacing: 0.005em;
+}
+.tools-hover p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 43, 34, 0.35);
+  color: #dbe3df;
+  line-height: 1.2;
+  transition:
+    border-color 0.3s,
+    background-color 0.3s;
+}
+.tool-chip .tool-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--accent-2);
+  transition: color 0.3s;
+}
+.tools-hover .group\/product:hover .tool-chip,
+.tools-hover > :hover .tool-chip {
+  border-color: rgba(57, 230, 160, 0.28);
+}
+.tools-hover > :hover .tool-icon {
+  color: var(--accent);
+}
+@media (max-width: 640px) {
+  .tools-hover p {
+    font-size: 14px;
+    gap: 7px;
+  }
+  .tool-chip {
+    padding: 6px 9px;
+  }
+}

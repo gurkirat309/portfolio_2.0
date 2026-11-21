@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { MotionConfig } from 'motion/react';
 import { stack } from './content.js';
 import { HoverEffect } from '@/components/ui/card-hover-effect';
+import ToolIcon from './toolIcons.jsx';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -16,7 +17,20 @@ gsap.registerPlugin(ScrollTrigger);
 // Under reduced motion the reveal, beam dot and particles rest, and Motion skips the glide.
 
 // One card per category: its name, then its tools.
-const ITEMS = stack.map((g) => ({ title: g.group, description: g.items.join(' · ') }));
+// Each tool is a chip: its icon and its name (spans, so they sit validly inside the card's <p>).
+const ITEMS = stack.map((g) => ({
+  title: g.group,
+  description: (
+    <>
+      {g.items.map((t) => (
+        <span className="tool-chip" key={t}>
+          <ToolIcon name={t} />
+          {t}
+        </span>
+      ))}
+    </>
+  ),
+}));
 
 const TITLE = 'Tools I build with';
 
