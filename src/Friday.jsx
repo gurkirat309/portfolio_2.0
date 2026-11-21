@@ -83,6 +83,16 @@ function Answer({ text }) {
 
 export default function Friday({ visible }) {
   const [open, setOpen] = useState(false);
+  // Over the footer the pill tucks into a small, half-transparent round icon, so it doesn't
+  // cover the footer's links and wordmark (most of all on phones). Hover or focus brings it back.
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    const footer = document.querySelector('.site-footer');
+    if (!footer) return undefined;
+    const io = new IntersectionObserver(([e]) => setTucked(e.isIntersecting), { threshold: 0 });
+    io.observe(footer);
+    return () => io.disconnect();
+  }, []);
   const [messages, setMessages] = useState([]); // { role, content, error? }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -157,7 +167,7 @@ export default function Friday({ visible }) {
   const waiting = busy && messages[messages.length - 1]?.content === '';
 
   return (
-    <div className={`friday ${visible ? 'is-on' : ''} ${open ? 'is-open' : ''}`}>
+    <div className={`friday ${visible ? 'is-on' : ''} ${open ? 'is-open' : ''} ${tucked && !open ? 'is-tucked' : ''}`}>
       <section
         className="friday__panel"
         id="friday-panel"

@@ -2743,3 +2743,32 @@ h3 {
 .sgf.site-footer {
   z-index: 2;
 }
+
+/* F.R.I.D.A.Y. over the footer: tucked into a small, half-transparent round icon */
+.friday__launch {
+  transition:
+    opacity 0.4s var(--ease),
+    transform 0.4s var(--ease),
+    visibility 0s 0.4s,
+    border-color 0.3s,
+    color 0.3s,
+    padding 0.35s var(--ease),
+    gap 0.35s var(--ease);
+}
+.friday.is-on.is-tucked .friday__launch {
+  gap: 0;
+  padding: 0 11px;
+  opacity: 0.55;
+}
+.friday.is-tucked .friday__launch-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.friday.is-on.is-tucked .friday__launch:hover,
+.friday.is-on.is-tucked .friday__launch:focus-visible {
+  opacity: 1;
+}

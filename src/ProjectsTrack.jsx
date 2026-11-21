@@ -137,7 +137,7 @@ function Row({ row, index }) {
     <div className={`hp-pin ${reverse ? 'hp-pin--reverse' : ''}`} ref={pinWrap}>
       <div className="wrap hp-head">
         {isFirst ? (
-          <Head label="Projects" title="Selected projects" id="projects-h" />
+          <Head label="Projects" title="How each one works" id="projects-details-h" />
         ) : (
           <div className="head">
             <p className="eyebrow">Projects</p>
@@ -174,7 +174,7 @@ function Row({ row, index }) {
 
 export default function ProjectsTrack() {
   return (
-    <section className="section section--hp" id="projects" aria-labelledby="projects-h">
+    <section className="section section--hp" id="projects-details" aria-labelledby="projects-details-h">
       {ROWS.map((row, index) => (
         <Row row={row} index={index} key={index} />
       ))}

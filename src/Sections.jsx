@@ -1,6 +1,7 @@
 import { person, about, projects, experience, stack, hackathons, certifications } from './content.js';
 import { Ext, Head, useMedia } from './ui.jsx';
 import ProjectsTrack from './ProjectsTrack.jsx';
+import ProjectsWall from './ProjectsWall.jsx';
 import StackTools from './StackTools.jsx';
 import ExperienceTimeline from './ExperienceTimeline.jsx';
 import ProjectShot from './ProjectShot.jsx';
@@ -81,14 +82,13 @@ function ProjectCard({ p, feature }) {
 // reduced motion keep the stacked cards, where long project notes stay easy to read.
 const WIDE_Q = '(min-width: 861px) and (min-aspect-ratio: 1/1) and (min-height: 560px)';
 
-export function Projects({ reducedMotion }) {
-  const wide = useMedia(WIDE_Q);
-  if (wide && !reducedMotion) return <ProjectsTrack />;
+// Stacked project cards: the phone layout of the details, and the whole section under reduced motion.
+function StackedProjects({ id, headId, title }) {
   const [lead, ...rest] = projects;
   return (
-    <section className="section" id="projects" aria-labelledby="projects-h">
+    <section className="section" id={id} aria-labelledby={headId}>
       <div className="wrap">
-        <Head label="Projects" title="Selected projects" id="projects-h" />
+        <Head label="Projects" title={title} id={headId} />
         <ProjectCard p={lead} feature />
         <div className="grid grid--2">
           {rest.map((p) => (
@@ -100,6 +100,23 @@ export function Projects({ reducedMotion }) {
         </p>
       </div>
     </section>
+  );
+}
+
+// Projects: the parallax wall of screenshots first, then the details (the pinned horizontal
+// rows on wide screens, stacked cards on phones). Reduced motion gets the stacked cards alone.
+export function Projects({ reducedMotion }) {
+  const wide = useMedia(WIDE_Q);
+  if (reducedMotion) return <StackedProjects id="projects" headId="projects-h" title="Selected projects" />;
+  return (
+    <>
+      <ProjectsWall />
+      {wide ? (
+        <ProjectsTrack />
+      ) : (
+        <StackedProjects id="projects-details" headId="projects-details-h" title="How each one works" />
+      )}
+    </>
   );
 }
 
