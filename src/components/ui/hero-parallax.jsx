@@ -20,6 +20,7 @@ import {
 //   from md up they are the 480x240 cards with the source's 80px gaps.
 // - On phones the rows drop from -350px to 150px as the wall straightens (source: -700 to 500,
 //   kept from md up), with the bottom room to match.
+// - Card images load lazily, so they don't compete with the intro's frames on first load.
 
 export const HeroParallax = ({
   products,
@@ -159,6 +160,8 @@ export const ProductCard = ({
           src={product.thumbnail}
           height="600"
           width="600"
+          loading="lazy"
+          decoding="async"
           className="object-cover object-left-top absolute h-full w-full inset-0"
           alt={product.title}
         />

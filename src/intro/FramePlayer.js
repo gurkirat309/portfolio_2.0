@@ -7,11 +7,15 @@
 // costs about a millisecond and the picture keeps up with the scroll in both directions.
 
 const FETCH_CONCURRENCY = 6;
-const DECODE_CONCURRENCY = 3;
 const MIN_SWAP_MS = 30;
-// When the exact frame isn't decoded yet, show a neighbour at most this many frames away
-// (a third of a second of footage); otherwise keep the picture already on the canvas.
+// When the exact frame isn't decoded yet, show a decoded frame that lies on the way from the
+// picture already on screen to the target, or one at most this many frames from the target.
+// Never a far-off frame (like the poster at frame 0 or the smoke at the end): that flashes.
 const MAX_GAP = 8;
+// Fast scrolls: decode where the playhead will be, not where it is. How far ahead we plan
+// (in time), and the most frames we look ahead.
+const LOOKAHEAD_MS = 320;
+const MAX_AHEAD = 120;
 
 // Coarse-to-fine load order: a sparse pass first so the whole timeline is scrubbable early.
 function loadOrder(count) {
@@ -31,9 +35,11 @@ function loadOrder(count) {
 export class FramePlayer {
   constructor(canvas, manifest, setName, { onProgress, onScrubbable, onDraw } = {}) {
     this.canvas = canvas;
-    // A normal, compositor-synced canvas: 'desynchronized' (low-latency) mode can tear and
-    // flicker on phone GPUs.
-    this.ctx = canvas.getContext('2d', { alpha: false });
+    // Low-latency ('desynchronized') canvas on mouse-driven computers, where it keeps the picture
+    // locked to the scroll; a normal compositor-synced canvas on touch devices, where that mode
+    // can tear and flicker on phone GPUs.
+    const desktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches && navigator.maxTouchPoints === 0;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: desktop });
     this.count = manifest.count;
     this.fps = manifest.fps;
     this.set = manifest.sets[setName];
@@ -54,6 +60,14 @@ export class FramePlayer {
     const small = Math.min(screen.width, screen.height) < 900;
     this.keepBack = small ? 8 : 10;
     this.keepAhead = small ? 14 : 22;
+    // Most decoded frames held at once (memory cap; spaced out along the path when scrolling fast).
+    this.maxDecoded = small ? 30 : 48;
+    this.decodeConcurrency = (navigator.hardwareConcurrency || 4) >= 8 && !small ? 4 : 3;
+    // Scroll speed in frames per millisecond (signed), and how long a decode takes (measured).
+    this.vel = 0;
+    this.velF = 0;
+    this.velT = 0;
+    this.decodeMs = 30;
     this.last = { f: -1, key: '' };
     this.lastA = -1;
     this.lastSwap = 0;
@@ -82,23 +96,56 @@ export class FramePlayer {
     await Promise.all(Array.from({ length: FETCH_CONCURRENCY }, worker));
   }
 
-  // Decode the frames nearest the playhead first, leaning toward the scroll direction.
+  // Current scroll speed and the plan it implies: how far ahead decodes should land, how far
+  // apart the frames worth decoding are, and how far ahead to look.
+  plan() {
+    const v = performance.now() - this.velT < 120 ? this.vel : 0;
+    const speed = Math.abs(v); // frames per ms
+    const dir = v > 0.0005 ? 1 : v < -0.0005 ? -1 : this.dir;
+    // Between two picture changes (MIN_SWAP_MS) the playhead moves speed * MIN_SWAP_MS frames,
+    // so at speed only every stride-th frame can ever be shown: decode just those.
+    const stride = Math.max(1, Math.round(speed * MIN_SWAP_MS));
+    // A decode started now finishes this many frames further on.
+    const lead = Math.round(speed * (this.decodeMs + 16));
+    const ahead = Math.min(MAX_AHEAD, this.keepAhead + Math.round(speed * LOOKAHEAD_MS));
+    return { dir, stride, lead, ahead };
+  }
+
+  // Frames worth decoding next, best first.
+  wanted() {
+    const { dir, stride, lead, ahead } = this.plan();
+    const out = [];
+    const ok = (i) => i >= 0 && i < this.count && this.blobs[i] && !this.bitmaps.has(i) && !this.decoding.has(i);
+    if (stride === 1) {
+      // Slow: every frame around the playhead, nearest first, leaning toward the scroll direction.
+      const lo = Math.max(0, this.center - (dir > 0 ? this.keepBack : ahead));
+      const hi = Math.min(this.count - 1, this.center + (dir > 0 ? ahead : this.keepBack));
+      const list = [];
+      for (let i = lo; i <= hi; i += 1) {
+        if (!ok(i)) continue;
+        const d = i - this.center;
+        list.push([d * dir >= 0 ? Math.abs(d) : Math.abs(d) * 1.6, i]);
+      }
+      list.sort((a, b) => a[0] - b[0]);
+      for (const [, i] of list) out.push(i);
+    } else {
+      // Fast: frames spaced stride apart along the path, starting where the playhead will be
+      // when the decode is done.
+      for (let k = 0; ; k += 1) {
+        const i = this.center + dir * (lead + k * stride);
+        if (i < 0 || i >= this.count || Math.abs(i - this.center) > ahead) break;
+        if (ok(i)) out.push(i);
+      }
+    }
+    return out;
+  }
+
+  // Decode the frames the plan wants, a few at a time, off the main thread.
   pump() {
     if (this.destroyed) return;
-    const lo = Math.max(0, this.center - (this.dir > 0 ? this.keepBack : this.keepAhead));
-    const hi = Math.min(this.count - 1, this.center + (this.dir > 0 ? this.keepAhead : this.keepBack));
-    while (this.decoding.size < DECODE_CONCURRENCY) {
-      let pick = -1;
-      let best = Infinity;
-      for (let i = lo; i <= hi; i += 1) {
-        if (!this.blobs[i] || this.bitmaps.has(i) || this.decoding.has(i)) continue;
-        const d = i - this.center;
-        const cost = d * this.dir >= 0 ? Math.abs(d) : Math.abs(d) * 1.6;
-        if (cost < best) {
-          best = cost;
-          pick = i;
-        }
-      }
+    const queue = this.wanted();
+    while (this.decoding.size < this.decodeConcurrency) {
+      let pick = queue.length ? queue.shift() : -1;
       if (pick < 0) {
         // Keep the first and last frames ready for the poster and the background.
         for (const i of [0, this.count - 1]) {
@@ -107,9 +154,11 @@ export class FramePlayer {
       }
       if (pick < 0) break;
       this.decoding.add(pick);
+      const started = performance.now();
       createImageBitmap(this.blobs[pick])
         .then((bm) => {
           this.decoding.delete(pick);
+          this.decodeMs = this.decodeMs * 0.8 + (performance.now() - started) * 0.2;
           if (this.destroyed) return bm.close();
           this.bitmaps.set(pick, bm);
           this.dirty = true;
@@ -122,27 +171,47 @@ export class FramePlayer {
   }
 
   evict() {
-    const lo = this.center - this.keepAhead - 4;
-    const hi = this.center + this.keepAhead + 4;
+    const { dir, ahead } = this.plan();
+    const lo = this.center - (dir > 0 ? this.keepBack : ahead) - 4;
+    const hi = this.center + (dir > 0 ? ahead : this.keepBack) + 4;
+    const keep = (i) => i === 0 || i === this.count - 1 || i === this.lastA;
     for (const [i, bm] of this.bitmaps) {
-      if ((i < lo || i > hi) && i !== 0 && i !== this.count - 1 && i !== this.lastA) {
+      if ((i < lo || i > hi) && !keep(i)) {
         bm.close();
+        this.bitmaps.delete(i);
+      }
+    }
+    // Memory cap: drop the frames furthest from the playhead first.
+    if (this.bitmaps.size > this.maxDecoded) {
+      const far = [...this.bitmaps.keys()]
+        .filter((i) => !keep(i))
+        .sort((a, b) => Math.abs(b - this.center) - Math.abs(a - this.center));
+      for (const i of far.slice(0, this.bitmaps.size - this.maxDecoded)) {
+        this.bitmaps.get(i).close();
         this.bitmaps.delete(i);
       }
     }
   }
 
+  // The decoded frame to show for target i: the closest one that is either on the way from the
+  // picture already on screen to the target (so the picture only moves along with the scroll),
+  // or within MAX_GAP of the target. A far-off frame is never shown: that flashes.
   nearest(i) {
     if (this.bitmaps.has(i)) return i;
-    // Bounded search: on a fast swipe that outruns decoding, jumping to a far decoded frame
-    // (like the poster at frame 0 or the smoke at the end) flashes the wrong picture.
-    for (let d = 1; d <= MAX_GAP; d += 1) {
-      const a = i - d * this.dir;
-      const b = i + d * this.dir;
-      if (a >= 0 && a < this.count && this.bitmaps.has(a)) return a;
-      if (b >= 0 && b < this.count && this.bitmaps.has(b)) return b;
+    const from = this.lastA >= 0 ? this.lastA : i;
+    const lo = Math.min(from, i);
+    const hi = Math.max(from, i);
+    let best = -1;
+    let bestD = Infinity;
+    for (const x of this.bitmaps.keys()) {
+      const d = Math.abs(x - i);
+      if (!(d <= MAX_GAP || (x >= lo && x <= hi))) continue;
+      if (d < bestD) {
+        bestD = d;
+        best = x;
+      }
     }
-    return -1;
+    return best;
   }
 
   resize(vw, vh) {
@@ -171,6 +240,13 @@ export class FramePlayer {
     const fi = Math.max(0, Math.min(this.count - 1, f));
     const i = Math.floor(fi);
     const center = Math.round(fi);
+    // Track scroll speed (frames per ms), smoothed, to plan decodes ahead of fast scrolls.
+    const tNow = performance.now();
+    const dt = tNow - this.velT;
+    if (dt > 0 && dt < 200) this.vel = this.vel * 0.6 + ((fi - this.velF) / dt) * 0.4;
+    else this.vel = 0;
+    this.velF = fi;
+    this.velT = tNow;
     if (center !== this.center) {
       this.dir = center > this.center ? 1 : -1;
       this.center = center;

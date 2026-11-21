@@ -82,6 +82,8 @@ export default function Intro({ reducedMotion, onDoneChange }) {
       });
       player.resize(size.vw, size.vh);
       lastT = -1;
+      // Development only (stripped from production builds): lets a test read what the player shows.
+      if (import.meta.env.DEV) window.__introPlayer = player;
     };
 
     const measure = () => {
