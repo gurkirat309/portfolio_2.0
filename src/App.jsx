@@ -85,7 +85,7 @@ export default function App() {
       </a>
       <Nav introDone={introDone} />
       <Intro reducedMotion={reducedMotion} onDoneChange={onDoneChange} />
-      <Ambient reducedMotion={reducedMotion} active={introDone} />
+      <Ambient />
       <main ref={main} className="content">
         <About />
         <Projects reducedMotion={reducedMotion} />

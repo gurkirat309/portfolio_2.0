@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { HeroParallax } from '@/components/ui/hero-parallax';
 import { projects } from './content.js';
 
@@ -19,9 +20,39 @@ const card = (p) => ({
 
 const WALL = order.flatMap((row) => row.map((i) => card(projects[i]))).filter(Boolean);
 
+// The five screenshots, fetched and decoded in the background once the section is about a
+// screen and a half away. The wall and the detail rows both use them; decoding them on first
+// sight, mid-slide, was the one repeatable stutter in a full top-to-bottom scroll test.
+// Kept in this list so the decoded images stay alive.
+const warmed = [];
+function warmScreenshots() {
+  if (warmed.length) return;
+  for (const src of new Set(projects.map((p) => p.image))) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.decode?.().catch(() => {});
+    warmed.push(img);
+  }
+}
+
 export default function ProjectsWall() {
+  const section = useRef(null);
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        io.disconnect();
+        warmScreenshots();
+      },
+      { rootMargin: '150% 0px' },
+    );
+    io.observe(section.current);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <section className="projects-wall" id="projects" aria-labelledby="projects-h">
+    <section className="projects-wall" id="projects" aria-labelledby="projects-h" ref={section}>
       <HeroParallax
         products={WALL}
         header={{

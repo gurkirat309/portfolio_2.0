@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { MotionConfig } from 'motion/react';
@@ -8,13 +8,13 @@ import ToolIcon from './toolIcons.jsx';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// "Tools I build with": six category cards over a faint grid.
+// "Tools I build with": six category cards.
 // - heading words blur into focus once (the BlurText idea, done with GSAP)
 // - cards rise in one after another the first time they reach the screen
 // - a green beam on the left fills as you scroll through the section
 // - the cards are Aceternity's Card Hover Effect: one highlight glides to whichever card is
 //   under the pointer (Motion's shared layout animation)
-// Under reduced motion the reveal, beam dot and particles rest, and Motion skips the glide.
+// Under reduced motion the reveal and beam dot rest, and Motion skips the glide.
 
 // One card per category: its name, then its tools.
 // Each tool is a chip: its icon and its name (spans, so they sit validly inside the card's <p>).
@@ -34,25 +34,8 @@ const ITEMS = stack.map((g) => ({
 
 const TITLE = 'Tools I build with';
 
-// Fourteen faint particles, placed by a fixed formula so every visit looks the same.
-const DOTS = Array.from({ length: 14 }, (_, k) => ({
-  left: `${(k * 37 + 11) % 100}%`,
-  top: `${(k * 53 + 17) % 100}%`,
-  '--size': `${2 + (k % 3)}px`,
-  '--dur': `${10 + ((k * 7) % 8)}s`,
-  '--delay': `${-((k * 13) % 10)}s`,
-}));
-
 export default function StackTools({ reducedMotion }) {
   const section = useRef(null);
-  const [inView, setInView] = useState(false);
-
-  // Pause the drifting particles while the section is off screen.
-  useEffect(() => {
-    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: '100px' });
-    io.observe(section.current);
-    return () => io.disconnect();
-  }, []);
 
   useLayoutEffect(() => {
     if (reducedMotion) return undefined;
@@ -112,18 +95,11 @@ export default function StackTools({ reducedMotion }) {
 
   return (
     <section
-      className={`section tools ${inView ? 'is-live' : ''} ${reducedMotion ? 'is-still' : ''}`}
+      className={`section tools ${reducedMotion ? 'is-still' : ''}`}
       id="stack"
       aria-labelledby="stack-h"
       ref={section}
     >
-      <div className="tools__bg" aria-hidden="true">
-        <div className="tools__grid" />
-        {DOTS.map((d, k) => (
-          <span className="tools__dot" key={k} style={d} />
-        ))}
-      </div>
-
       <div className="wrap tools-body">
         <div className="tools-beam" aria-hidden="true">
           <span className="tools-beam__fill" />
