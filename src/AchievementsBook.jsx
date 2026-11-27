@@ -187,8 +187,15 @@ function buildLeaves(single) {
     pages.push(<HackText key={`t${i}`} h={h} n={i + 1} num={(num += 1)} />);
   });
   certifications.forEach((c, i) => pages.push(<Cert key={c.name} c={c} n={i + 1} num={(num += 1)} />));
+  // Pages come in pairs (each sheet has a front and a back). With an even count so far, the
+  // closing page becomes the right-hand page under the stack, so the book never ends on a blank
+  // page; with an odd count it goes on the last sheet's back, facing the back cover.
+  if (pages.length % 2 === 0) {
+    const leaves = [];
+    for (let i = 0; i < pages.length; i += 2) leaves.push([pages[i], pages[i + 1]]);
+    return { leaves, base: <Closing num={(num += 1)} /> };
+  }
   pages.push(<Closing key="closing" num={(num += 1)} />);
-  if (pages.length % 2) pages.push(<Blank key="pad" />);
   const leaves = [];
   for (let i = 0; i < pages.length; i += 2) leaves.push([pages[i], pages[i + 1]]);
   return { leaves, base: <BackCover /> };

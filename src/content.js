@@ -131,6 +131,7 @@ export const hackathons = [
 ];
 
 export const certifications = [
+  { name: 'Claude Certified Architect – Professional', issuer: 'Anthropic', date: 'Nov 2026', href: 'https://www.credly.com/badges/6cac51d0-e7f5-4dd2-afb4-20f9804688dc', image: '/img/claude-architect-pro.webp' },
   { name: 'Claude Certified Architect – Foundations', issuer: 'Anthropic', date: 'Mar 2026', href: 'https://www.credly.com/badges/a031fba6-692c-4243-9b21-ef768302aee2', image: '/img/claude-architect.webp' },
   { name: 'Claude Certified Developer – Foundations', issuer: 'Anthropic', date: 'Oct 2026', href: 'https://www.credly.com/badges/bca77f25-c5ca-48d6-b514-885b63ac7fa8', image: '/img/claude-developer.webp' },
   { name: 'Generative AI', issuer: 'Oracle', href: '/img/oracle.webp' },
